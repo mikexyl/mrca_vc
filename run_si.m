@@ -11,9 +11,25 @@
 
 %% clean workspace
 close all
-clear all
+clear 
 clear
 clc
+
+try
+    node = ros2node("/matlab_client_node");
+catch
+    % Node may already exist, try to get the existing node
+    node = ros2node.list; % returns a cell array of node objects
+    if isempty(node)
+        error('No ROS2 node available.');
+    end
+    node = node{1};
+end
+
+
+% Define service name and type
+serviceName = "/pose_graph_optimization";
+serviceType = "raido/PoseGraphOptimization"; 
 
 
 seed_num = 0;
@@ -31,7 +47,7 @@ initialize_si;
 
 
 %% create a multi-robot system
-System = CSystem(nRobot, nBoxObs, pr);
+System = CSystem(nRobot, nBoxObs, pr, node);
 
 
 %% robot initial state
@@ -181,6 +197,22 @@ while(true && n_loop < logsize)
      
     %% get system state
     System.getSystemState();
+
+    %% global pgo
+    optimized_poses = System.globalPGO();
+    % Visualize optimized poses in the same style as robots, but with black dashed edge and no fill
+    if ~isempty(optimized_poses)
+        for iRobot = 1 : nRobot
+            if pr.dim == 2
+                [Xopt, Yopt] = ellipse(optimized_poses(:, iRobot), System.MultiRobot_{iRobot}.radius_.*[1;1], 0);
+                plot(Xopt, Yopt, 'k--', 'LineWidth', 2, 'DisplayName', 'Optimized');
+            elseif pr.dim == 3
+                [Xopt, Yopt, Zopt] = ellipsoid(optimized_poses(1, iRobot), optimized_poses(2, iRobot), optimized_poses(3, iRobot), ...
+                    System.MultiRobot_{iRobot}.radius_, System.MultiRobot_{iRobot}.radius_, System.MultiRobot_{iRobot}.radius_);
+                surf(Xopt, Yopt, Zopt, 'EdgeColor', 'k', 'FaceAlpha', 0, 'LineStyle', '--', 'LineWidth', 2, 'DisplayName', 'Optimized');
+            end
+        end
+    end
     
     %% logging state info
     for iRobot = 1 : nRobot

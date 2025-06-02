@@ -759,7 +759,21 @@ classdef CSingleInt < handle
             
         end
         
-            
+        %% ========== Get Odometry Step ==========
+        function [delta_pos, odom_cov] = getOdometryStep(obj)
+            % Returns the position change (odometry) and odometry covariance since last step
+            % delta_pos: position change since last call
+            % odom_cov: odometry covariance (assume equal to pos_measure_cov_)
+
+            persistent last_pos
+            if isempty(last_pos)
+                last_pos = obj.pos_real_;
+            end
+            delta_pos = obj.pos_real_ - last_pos;
+            odom_cov = obj.pos_measure_cov_;
+            last_pos = obj.pos_real_;
+        end
+        
     end
     
     

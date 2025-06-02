@@ -102,9 +102,9 @@ classdef CSystem < handle
                 disp('initializing')
                 iRobot
                 %% initialize robot ros2 service client
-                robot_service_name  = sprintf('dpgo_server_%c/pose_graph_optimization', iRobot-1+'a');
+                robot_service_name  = sprintf('dpgo_server_%d/pose_graph_optimization', iRobot);
                 obj.clients{iRobot} = ros2svcclient(ros2_node, robot_service_name, serviceType);
-                robot_reset_service_name  = sprintf('dpgo_server_%c/reset', iRobot-1+'a');
+                robot_reset_service_name  = sprintf('dpgo_server_%d/reset', iRobot);
                 obj.reset_clients{iRobot} = ros2svcclient(ros2_node, robot_reset_service_name, "std_srvs/Empty");
                 % Call the reset service (std_srvs/Empty)
                 reset_msg = ros2message(obj.reset_clients{iRobot});
@@ -127,7 +127,7 @@ classdef CSystem < handle
 
             rel_pos = [];
             idx_in_range = [];
-            rel_cov       = zeros(obj.dim_,    obj.dim_,  0); % M×M×0, so rel_cov(:,:,end+1)=… works
+            rel_cov = [];
             pos_i = obj.multi_robot_pos_real_(:, iRobot);
             for j = 1:obj.nRobot_
                 if j == iRobot
@@ -138,7 +138,7 @@ classdef CSystem < handle
                 if dist <= obj.meas_and_comm_range
                     rel_pos = [rel_pos, pos_j - pos_i];
                     idx_in_range = [idx_in_range, j];
-                    rel_cov(:,:,end+1)=obj.multi_robot_pos_est_cov_(:,:,j);
+                    rel_cov[:,:,j]=obj.mul;
                 end
             end
         end
@@ -375,7 +375,7 @@ classdef CSystem < handle
             for i = 1:nRobot
                 if obj.time_step_global_ > 0
                     delta_pos = delta_pos_all{i};
-                    odom_cov = odom_cov_all{i};
+                    odom_cov = odom_cov_all(:,:,i);
                     % Odometry is between previous and current pose of the same robot
                     msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys1(end).robot = char(i+'a'-1);

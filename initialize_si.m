@@ -101,12 +101,12 @@ end
 % robot localization measurement noise
 robotPosNoise = zeros(pr.dim, pr.dim, nRobot);
 for iRobot = 1 : nRobot
-    robotPosNoise(:, :, iRobot) = 0.10^2 * eye(pr.dim);
+    robotPosNoise(:, :, iRobot) = 0.2^2 * eye(pr.dim);
 end
 % obs localization measurment noise
 boxPosNoise = zeros(pr.dim, pr.dim, nBoxObs);
 for iBox = 1 : nBoxObs
-    boxPosNoise(:, :, iBox) = 0.10^2 * eye(pr.dim);
+    boxPosNoise(:, :, iBox) = 0.2^2 * eye(pr.dim);
 end
 pr.nRobot = nRobot;
 pr.robotStartPos = robotStartPos;
@@ -117,6 +117,7 @@ pr.boxPos = boxPos;
 pr.boxSize = boxSize;
 pr.boxYaw = boxYaw;
 pr.boxPosNoise = boxPosNoise;
+pr.meas_and_comm_range = 5.0;  % measurement and communication range, m
 
 %% For mpc
 si_mpc_setup;
