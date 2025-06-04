@@ -11,7 +11,7 @@
 
 %% clean workspace
 close all
-clear 
+clear
 clear
 clc
 
@@ -29,7 +29,7 @@ end
 
 % Define service name and type
 serviceName = "/pose_graph_optimization";
-serviceType = "raido/PoseGraphOptimization"; 
+serviceType = "raido/PoseGraphOptimization";
 
 
 seed_num = 0;
@@ -108,75 +108,26 @@ for i = 1       % for wrapping up
             'FaceColor', [0.4 0.4 0.4], 'FaceAlpha', 0.6, ...
             'EdgeColor', 'k', 'EdgeAlpha', 0.8);
     end
-    % plot robot initial positions with figure handles
+    % plot robot initial positions, opt pos, opt cov, dummy cov with figure handles
     fig_robot_pos = cell(nRobot, 1);
-    for iRobot = 1 : nRobot
-        if pr.dim == 2
-            fig_robot_pos{iRobot} = plot_ellipse_2D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1], 0, ...
-                'EdgeColor', 'black', ...
-                'FaceColor', color_robot{iRobot}, ...
-                'FaceAlpha', 0.5, ...
-                'LineStyle', ':', ...
-                'LineWidth', 2);
-        elseif pr.dim == 3
-            fig_robot_pos{iRobot} = plot_ellipsoid_3D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1;1], 0, ...
-                'EdgeColor', color_robot{iRobot}, ...
-                'FaceColor', color_robot{iRobot});
-        end
-    end
-
     fig_robot_opt_pos = cell(nRobot, 1);
-    for iRobot = 1 : nRobot
-        if pr.dim == 2
-            fig_robot_opt_pos{iRobot} = plot_ellipse_2D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1], 0, ...
-                'EdgeColor', color_robot{iRobot}, ...
-                'FaceColor', color_robot{iRobot}, ...
-                'FaceAlpha', 1);
-        elseif pr.dim == 3
-            fig_robot_opt_pos{iRobot} = plot_ellipsoid_3D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1;1], 0, ...
-                'EdgeColor', color_robot{iRobot}, ...
-                'FaceColor', color_robot{iRobot});
-        end
-    end
-
     fig_robot_opt_cov = cell(nRobot, 1);
-    for iRobot = 1 : nRobot
-        if pr.dim == 2
-            fig_robot_opt_cov{iRobot} = plot_ellipse_2D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1], 0, ...
-                'EdgeColor', color_robot{iRobot}, ...
-                'FaceColor', color_robot{iRobot}, ...
-                'FaceAlpha', 0.2);
-        elseif pr.dim == 3
-            fig_robot_opt_cov{iRobot} = plot_ellipsoid_3D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1;1], 0, ...
-                'EdgeColor', color_robot{iRobot}, ...
-                'FaceColor', color_robot{iRobot}, ...
-                'FaceAlpha', 0.2);
-        end
-    end
-
+    fig_robot_dpgo_pos = cell(nRobot, 1);
+    fig_robot_dpgo_cov = cell(nRobot, 1);
     fig_robot_dummy_cov = cell(nRobot, 1);
     for iRobot = 1 : nRobot
-        if pr.dim == 2
-            fig_robot_dummy_cov{iRobot} = plot_ellipse_2D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1], 0, ...
-                'EdgeColor', 'black', ...
-                'FaceColor', color_robot{iRobot}, ...
-                'LineStyle', ':', ...
-                'LineWidth', 1, ...
-                'FaceAlpha', 0.2);
-        elseif pr.dim == 3
-            fig_robot_dummy_cov{iRobot} = plot_ellipsoid_3D(ax_main, System.MultiRobot_{iRobot}.pos_real_, ...
-                System.MultiRobot_{iRobot}.radius_.*[1;1;1], 0, ...
-                'EdgeColor', color_robot{iRobot}, ...
-                'FaceColor', color_robot{iRobot}, ...
-                'FaceAlpha', 0.2);
-        end
+        fig_robot_pos{iRobot} = plot_robot_shape(ax_main, pr.dim, System.MultiRobot_{iRobot}.pos_real_, System.MultiRobot_{iRobot}.radius_.*ones(pr.dim,1), color_robot{iRobot}, ...
+            'EdgeColor', 'black', 'FaceAlpha', 0.5, 'LineStyle', ':', 'LineWidth', 2);
+        fig_robot_opt_pos{iRobot} = plot_robot_shape(ax_main, pr.dim, System.MultiRobot_{iRobot}.pos_real_, System.MultiRobot_{iRobot}.radius_.*ones(pr.dim,1), color_robot{iRobot}, ...
+            'EdgeColor', color_robot{iRobot}, 'FaceAlpha', 1);
+        fig_robot_opt_cov{iRobot} = plot_robot_shape(ax_main, pr.dim, System.MultiRobot_{iRobot}.pos_real_, System.MultiRobot_{iRobot}.radius_.*ones(pr.dim,1), color_robot{iRobot}, ...
+            'EdgeColor', color_robot{iRobot}, 'FaceAlpha', 0.2);
+        fig_robot_dummy_cov{iRobot} = plot_robot_shape(ax_main, pr.dim, System.MultiRobot_{iRobot}.pos_real_, System.MultiRobot_{iRobot}.radius_.*ones(pr.dim,1), color_robot{iRobot}, ...
+            'EdgeColor', 'black', 'LineStyle', ':', 'LineWidth', 1, 'FaceAlpha', 0.2);
+        fig_robot_dpgo_pos{iRobot} = plot_robot_shape(ax_main, pr.dim, System.MultiRobot_{iRobot}.pos_real_, System.MultiRobot_{iRobot}.radius_.*ones(pr.dim,1), 'k', ...
+            'EdgeColor', 'k', 'FaceAlpha', 0.2, 'LineStyle', '--');
+        fig_robot_dpgo_cov{iRobot} = plot_robot_shape(ax_main, pr.dim, System.MultiRobot_{iRobot}.pos_real_, System.MultiRobot_{iRobot}.radius_.*ones(pr.dim,1), 'k', ...
+            'EdgeColor', 'k', 'FaceAlpha', 0.1, 'LineStyle', ':');
     end
     % plot robot obstacle-free convex region with figure handles
     fig_robot_region = cell(nRobot, 1);
@@ -243,13 +194,13 @@ fprintf('[%s] Looping... \n',datestr(now,'HH:MM:SS'));
 if_robots_arrived = zeros(nRobot, 1);
 % pause;
 while(true && n_loop < logsize)
-    
+
     %% control loop
     n_loop = n_loop + 1;
     if(mod(n_loop, 10) == 0)
         fprintf('[%s] Looping [%d] \n',datestr(now,'HH:MM:SS'), n_loop);
     end
-     
+
     %% get system state
     System.getSystemState();
 
@@ -262,8 +213,8 @@ while(true && n_loop < logsize)
                 [Xopt, Yopt] = ellipse(optimized_poses(:, iRobot), System.MultiRobot_{iRobot}.radius_.*[1;1], 0);
                 [Xcov, Ycov] = ellipse(optimized_poses(:, iRobot), ...
                     sqrt(diag(covs(:,:,iRobot))), 0);
-                set(fig_robot_opt_pos{iRobot}, 'XData', Xopt, 'YData', Yopt); 
-                set(fig_robot_opt_cov{iRobot}, 'XData', Xcov, 'YData', Ycov); 
+                set(fig_robot_opt_pos{iRobot}, 'XData', Xopt, 'YData', Yopt);
+                set(fig_robot_opt_cov{iRobot}, 'XData', Xcov, 'YData', Ycov);
             elseif pr.dim == 3
                 [Xopt, Yopt, Zopt] = ellipsoid(optimized_poses(1, iRobot), optimized_poses(2, iRobot), optimized_poses(3, iRobot), ...
                     System.MultiRobot_{iRobot}.radius_, System.MultiRobot_{iRobot}.radius_, System.MultiRobot_{iRobot}.radius_);
@@ -271,7 +222,14 @@ while(true && n_loop < logsize)
             end
         end
     end
-    
+
+    %% distributed pgo
+    dpgo_poses = cell(nRobot, 1);
+    dpgo_covs = cell(nRobot, 1);
+    for iRobot = 1:nRobot
+        [dpgo_poses{iRobot}, dpgo_covs{iRobot}] = System.distributedPGO(iRobot);
+    end
+
     %% logging state info
     for iRobot = 1 : nRobot
         log_robot_pos_real(:, n_loop, iRobot) = ...
@@ -285,7 +243,7 @@ while(true && n_loop < logsize)
         log_obs_size(:, n_loop, jBox) = System.multi_obs_size_real_(:, jBox);
         log_obs_yaw(:, n_loop, jBox) = System.multi_obs_yaw_real_(:, jBox);
     end
-    
+
     %% update system visulization
     for i = 1       % for wrapping up
         % robot current position
@@ -293,10 +251,10 @@ while(true && n_loop < logsize)
             if pr.dim == 2
                 [X, Y] = ellipse(System.MultiRobot_{iRobot}.pos_real_, ...
                     System.MultiRobot_{iRobot}.radius_.*[1;1], 0);
-                set(fig_robot_pos{iRobot}, 'XData', X, 'YData', Y); 
+                set(fig_robot_pos{iRobot}, 'XData', X, 'YData', Y);
                 [Xcov, Ycov] = ellipse(System.MultiRobot_{iRobot}.pos_real_, ...
                     sqrt(diag(System.multi_robot_pos_est_cov_(:,:,iRobot))), 0);
-                set(fig_robot_dummy_cov{iRobot}, 'XData', X, 'YData', Y); 
+                set(fig_robot_dummy_cov{iRobot}, 'XData', X, 'YData', Y);
             elseif pr.dim == 3
                 [X, Y, Z] = ellipsoid(System.MultiRobot_{iRobot}.pos_real_(1), ...
                     System.MultiRobot_{iRobot}.pos_real_(2), ...
@@ -304,7 +262,7 @@ while(true && n_loop < logsize)
                     System.MultiRobot_{iRobot}.radius_, ...
                     System.MultiRobot_{iRobot}.radius_, ...
                     System.MultiRobot_{iRobot}.radius_);
-                set(fig_robot_pos{iRobot}, 'XData', X, 'YData', Y, 'ZData', Z); 
+                set(fig_robot_pos{iRobot}, 'XData', X, 'YData', Y, 'ZData', Z);
             end
         end
         % robot convex region
@@ -338,24 +296,24 @@ while(true && n_loop < logsize)
             end
         end
     end
-    
+
     if sum(sum(System.collision_mtx_)) > 0
         fprintf('Collision happens!\n')
         pause;
-%         break;
+        %         break;
     end
-    
+
     %% simulate one step
     System.simSystemOneStep();
-    
+
     %% if robot arrived
     for iRobot = 1 : nRobot
         if_robots_arrived(iRobot) = System.MultiRobot_{iRobot}.isArrived_;
     end
-    
+
     %% collision checking
-    System.collisionChecking();    
-    
+    System.collisionChecking();
+
     %% logging control info
     for iRobot = 1 : nRobot
         log_robot_goal_final(:, n_loop, iRobot) = ...
@@ -369,18 +327,18 @@ while(true && n_loop < logsize)
         log_robot_input(:, n_loop, iRobot) = ...
             System.MultiRobot_{iRobot}.u_;
     end
-    
-    
+
+
     drawnow limitrate
     pause(0.01);
     % keyboard;
-%     pause(pr.dtSim);
-    
+    %     pause(pr.dtSim);
+
     %% end of simulation
     if sum(if_robots_arrived) == nRobot
         fprintf('All robots arrived!\n');
-%         pause;
+        %         pause;
         break;
     end
-    
+
 end

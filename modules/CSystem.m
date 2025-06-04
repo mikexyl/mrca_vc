@@ -97,6 +97,9 @@ classdef CSystem < handle
 
             serviceName = "pose_graph_optimization";
             serviceType = "raido_interfaces/PoseGraphOptimization";
+            resetServiceType = "raido_interfaces/Reset";
+
+            timestamp_str = datestr(now, 'yyyy-mm-dd_HH-MM-SS');
 
             for iRobot = 1 : nRobot
                 disp('initializing')
@@ -104,20 +107,23 @@ classdef CSystem < handle
                 %% initialize robot ros2 service client
                 robot_service_name  = sprintf('dpgo_server_%c/pose_graph_optimization', iRobot-1+'a');
                 obj.clients{iRobot} = ros2svcclient(ros2_node, robot_service_name, serviceType);
-                robot_reset_service_name  = sprintf('dpgo_server_%c/reset', iRobot-1+'a');
-                obj.reset_clients{iRobot} = ros2svcclient(ros2_node, robot_reset_service_name, "std_srvs/Empty");
+                robot_reset_service_name  = sprintf('dpgo_server_%c/reset', iRobot-1+'a')
+                obj.reset_clients{iRobot} = ros2svcclient(ros2_node, robot_reset_service_name, resetServiceType);
                 % Call the reset service (std_srvs/Empty)
                 reset_msg = ros2message(obj.reset_clients{iRobot});
+                reset_msg.message = timestamp_str;
                 call(obj.reset_clients{iRobot}, reset_msg);
             end
 
             global_service_name = 'dpgo_server_global/' + serviceName;
             obj.global_client = ros2svcclient(ros2_node, global_service_name, serviceType);
             global_reset_service_name = 'dpgo_server_global/reset';
-            obj.global_reset_client = ros2svcclient(ros2_node, global_reset_service_name, "std_srvs/Empty");
+            obj.global_reset_client = ros2svcclient(ros2_node, global_reset_service_name, resetServiceType);
             % Call the global reset service (std_srvs/Empty)
             global_reset_msg = ros2message(obj.global_reset_client);
+            global_reset_msg.message = timestamp_str;
             call(obj.global_reset_client, global_reset_msg);
+            disp('initialized global')
         end
 
         function [rel_pos, idx_in_range, rel_cov] = getRelativeRobotMeas(obj, iRobot)
@@ -360,6 +366,8 @@ classdef CSystem < handle
                     pose_cov.pose.position.y = rels(2,k);
                     if obj.dim_ > 2
                         pose_cov.pose.position.z = rels(3,k);
+                    else
+                        pose_cov.pose.position.z = 0;
                     end
                     pose_cov.pose.orientation.w = 1;
                     pose_cov.pose.orientation.x = 0;
@@ -389,6 +397,8 @@ classdef CSystem < handle
                     pose_cov.pose.position.y = delta_pos(2);
                     if obj.dim_ > 2
                         pose_cov.pose.position.z = delta_pos(3);
+                    else
+                        pose_cov.pose.position.z = 0;
                     end
                     pose_cov.pose.orientation.w = 1;
                     pose_cov.pose.orientation.x = 0;
@@ -412,6 +422,8 @@ classdef CSystem < handle
                     pose_cov.pose.position.y = obj.multi_robot_pos_est_(2,i);
                     if obj.dim_ > 2
                         pose_cov.pose.position.z = obj.multi_robot_pos_est_(3,i);
+                    else
+                        pose_cov.pose.position.z = 0;
                     end
                     pose_cov.pose.orientation.w = 1;
                     pose_cov.pose.orientation.x = 0;
@@ -432,16 +444,17 @@ classdef CSystem < handle
                 covs = zeros(obj.dim_, obj.dim_, nOpt);
                 assert(nOpt == obj.nRobot_)
                 for i = 1:nOpt
-                    optimized_poses(1, i) = response.poses(i).pose.position.x;
-                    optimized_poses(2, i) = response.poses(i).pose.position.y;
+                    iRobot = response.robots(i)-'a'+1;
+                    optimized_poses(1, iRobot) = response.poses(i).pose.position.x;
+                    optimized_poses(2, iRobot) = response.poses(i).pose.position.y;
                     if obj.dim_ > 2
-                        optimized_poses(3, i) = response.poses(i).pose.position.z;
+                        optimized_poses(3, iRobot) = response.poses(i).pose.position.z;
                     end
 
                     cov_vec = response.poses(i).covariance;
                     cov_mat = reshape(cov_vec, 6, 6)';
 
-                    covs(:,:,i)=cov_mat(obj.dim_, obj.dim_);
+                    covs(:,:,iRobot)=cov_mat(obj.dim_, obj.dim_);
                 end
             else
                 % print warning if no optimized poses returned
@@ -453,9 +466,170 @@ classdef CSystem < handle
             end
         end
 
+        function [opt_pose, cov] = distributedPGO(obj, iRobot)
+            % Collect local measurements for iRobot and send to its dpgo_server
+            % Returns optimized pose and covariance for iRobot
 
+            % Get relative measurements for iRobot
+            [rel_pos, idx_in_range, rel_cov] = obj.getRelativeRobotMeas(iRobot);
+            % Get odometry for iRobot
+            [delta_pos_all, odom_cov_all] = obj.getRobotOdometryEstimate();
+            delta_pos = delta_pos_all{iRobot};
+            odom_cov = odom_cov_all{iRobot};
+
+            % Prepare PoseGraphOptimization service message
+            msg = ros2message(obj.clients{iRobot});
+            msg.headers.stamp = ros2message('builtin_interfaces/Time');
+            msg.headers.frame_id = 'map';
+
+            % Add initial pose for iRobot
+            msg.initial_poses = ros2message('geometry_msgs/Pose');
+            msg.initial_poses(1).position.x = obj.multi_robot_pos_est_(1,iRobot);
+            msg.initial_poses(1).position.y = obj.multi_robot_pos_est_(2,iRobot);
+            if obj.dim_ > 2
+                msg.initial_poses(1).position.z = obj.multi_robot_pos_est_(3,iRobot);
+            else
+                msg.initial_poses(1).position.z = 0;
+            end
+            msg.initial_poses(1).orientation.w = 1;
+            msg.initial_poses(1).orientation.x = 0;
+            msg.initial_poses(1).orientation.y = 0;
+            msg.initial_poses(1).orientation.z = 0;
+            msg.initial_pose_keys = ros2message('raido_interfaces/MultiRobotKey');
+            msg.initial_pose_keys(1).robot = char(iRobot+'a'-1);
+            msg.initial_pose_keys(1).label = 'p';
+            msg.initial_pose_keys(1).key = int32(obj.time_step_global_);
+
+            % Add initial poses for observed neighbors
+            for n = 1:length(idx_in_range)
+                j = idx_in_range(n);
+                idx_pose = n+1; % 1 is iRobot, next are neighbors
+                msg.initial_poses(idx_pose).position.x = obj.multi_robot_pos_est_(1,j);
+                msg.initial_poses(idx_pose).position.y = obj.multi_robot_pos_est_(2,j);
+                if obj.dim_ > 2
+                    msg.initial_poses(idx_pose).position.z = obj.multi_robot_pos_est_(3,j);
+                else
+                    msg.initial_poses(idx_pose).position.z = 0;
+                end
+                msg.initial_poses(idx_pose).orientation.w = 1;
+                msg.initial_poses(idx_pose).orientation.x = 0;
+                msg.initial_poses(idx_pose).orientation.y = 0;
+                msg.initial_poses(idx_pose).orientation.z = 0;
+                msg.initial_pose_keys(idx_pose) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.initial_pose_keys(idx_pose).robot = char(j+'a'-1);
+                msg.initial_pose_keys(idx_pose).label = 'p';
+                msg.initial_pose_keys(idx_pose).key = int32(obj.time_step_global_);
+            end
+
+            % Fill constraints (relative measurements)
+            tmp = ros2message('raido_interfaces/MultiRobotKey');
+            msg.keys1 = tmp([]);
+            msg.keys2 = tmp([]);
+            tmp = ros2message("geometry_msgs/PoseWithCovariance");
+            msg.constraints = tmp([]);
+            for k = 1:length(idx_in_range)
+                j = idx_in_range(k);
+                msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.keys1(end).robot = char(iRobot+'a'-1);
+                msg.keys1(end).label = 'p';
+                msg.keys1(end).key = int32(obj.time_step_global_);
+                msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.keys2(end).robot = char(j+'a'-1);
+                msg.keys2(end).label = 'p';
+                msg.keys2(end).key = int32(obj.time_step_global_);
+                pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
+                pose_cov.pose.position.x = rel_pos(1,k);
+                pose_cov.pose.position.y = rel_pos(2,k);
+                if obj.dim_ > 2
+                    pose_cov.pose.position.z = rel_pos(3,k);
+                else
+                    pose_cov.pose.position.z = 0;
+                end
+                pose_cov.pose.orientation.w = 1;
+                pose_cov.pose.orientation.x = 0;
+                pose_cov.pose.orientation.y = 0;
+                pose_cov.pose.orientation.z = 0;
+                pose_cov.covariance = reshape(obj.covToMat6(rel_cov(:,:,k))', 1, 36);
+                msg.constraints(end+1) = pose_cov;
+            end
+
+            % Add odometry constraint for iRobot
+            if obj.time_step_global_ > 0
+                msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.keys1(end).robot = char(iRobot+'a'-1);
+                msg.keys1(end).label = 'p';
+                msg.keys1(end).key = int32(obj.time_step_global_-1);
+                msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.keys2(end).robot = char(iRobot+'a'-1);
+                msg.keys2(end).label = 'p';
+                msg.keys2(end).key = int32(obj.time_step_global_);
+                pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
+                pose_cov.pose.position.x = delta_pos(1);
+                pose_cov.pose.position.y = delta_pos(2);
+                if obj.dim_ > 2
+                    pose_cov.pose.position.z = delta_pos(3);
+                else
+                    pose_cov.pose.position.z = 0;
+                end
+                pose_cov.pose.orientation.w = 1;
+                pose_cov.pose.orientation.x = 0;
+                pose_cov.pose.orientation.y = 0;
+                pose_cov.pose.orientation.z = 0;
+                pose_cov.covariance = reshape(obj.covToMat6(odom_cov)', 1, 36);
+                msg.constraints(end+1) = pose_cov;
+            else
+                % add prior for first step
+                msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.keys1(end).robot = char(iRobot+'a'-1);
+                msg.keys1(end).label = 'p';
+                msg.keys1(end).key = int32(0);
+                msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                msg.keys2(end).robot = char(iRobot+'a'-1);
+                msg.keys2(end).label = 'p';
+                msg.keys2(end).key = int32(0);
+                pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
+                pose_cov.pose.position.x = obj.multi_robot_pos_est_(1,iRobot);
+                pose_cov.pose.position.y = obj.multi_robot_pos_est_(2,iRobot);
+                if obj.dim_ > 2
+                    pose_cov.pose.position.z = obj.multi_robot_pos_est_(3,iRobot);
+                else
+                    pose_cov.pose.position.z = 0;
+                end
+                pose_cov.pose.orientation.w = 1;
+                pose_cov.pose.orientation.x = 0;
+                pose_cov.pose.orientation.y = 0;
+                pose_cov.pose.orientation.z = 0;
+                pose_cov.covariance = reshape(eye(6),1,36);
+                msg.constraints(end+1) = pose_cov;
+            end
+
+            % Call the distributed PGO service for iRobot
+            response = call(obj.clients{iRobot}, msg);
+            % Extract optimized pose from the response
+            if isfield(response, 'poses') && ~isempty(response.poses)
+                opt_pose = cell(obj.nRobot_, 1);
+                cov = cell(obj.nRobot_, 1);
+                for i = 1:length(response.robots)
+                    robot = response.robots(i)-'a'+1;
+                    pose = response.poses(i);
+                    opt_pose{robot} = zeros(obj.dim_, 1);
+                    opt_pose{robot}(1) = pose.pose.position.x;
+                    opt_pose{robot}(2) = pose.pose.position.y;
+                    if obj.dim_ > 2
+                        opt_pose{robot}(3) = pose.pose.position.z;
+                    end
+                    cov_vec = pose.covariance;
+                    cov_mat = reshape(cov_vec, 6, 6)';
+                    cov{robot} = cov_mat(1:obj.dim_, 1:obj.dim_);
+                end
+            else
+                warning('No optimized pose returned from distributed PGO service for robot %d.', iRobot);
+                disp(response);
+                opt_pose = [];
+                cov = [];
+            end
+        end
 
     end
-
 
 end

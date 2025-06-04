@@ -580,11 +580,10 @@ classdef CSingleInt < handle
         
         %% ========== Simulate one step ==========
         function simulateOneStep(obj)
-           
+            obj.last_pos = obj.pos_real_;
             % perform one-step simulation for the robot
             dpos = obj.u_ * obj.dt_;                    % moved translation
             obj.pos_real_ = obj.pos_real_ + dpos;           % real position is simulated
-            
         end
         
         
@@ -771,7 +770,6 @@ classdef CSingleInt < handle
             end
             delta_pos = obj.pos_real_ - obj.last_pos;
             odom_cov = obj.pos_measure_cov_*0.1;
-            obj.last_pos = obj.pos_real_;
         end
         
     end
