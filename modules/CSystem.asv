@@ -310,7 +310,7 @@ classdef CSystem < handle
             end
         end
 
-        function optimized_poses = globalPGO(obj)
+        function [optimized_poses, covs] = globalPGO(obj)
             % Collect global measurements and send to global dpgo_server
             [rel_pos_all, rel_cov_all,idx_in_range_all,  delta_pos_all, odom_cov_all] = obj.getGlobalMeasurements();
             nRobot = obj.nRobot_;
@@ -429,12 +429,15 @@ classdef CSystem < handle
             if isfield(response, 'poses') && ~isempty(response.poses)
                 nOpt = numel(response.poses);
                 optimized_poses = zeros(obj.dim_, nOpt);
+                covs = zeros(obj.dim_, obj.dim_, nOpt);
                 for i = 1:nOpt
                     optimized_poses(1, i) = response.poses(i).pose.position.x;
                     optimized_poses(2, i) = response.poses(i).pose.position.y;
                     if obj.dim_ > 2
                         optimized_poses(3, i) = response.poses(i).pose.position.z;
                     end
+
+                    cov = 
                 end
             else
                 % print warning if no optimized poses returned

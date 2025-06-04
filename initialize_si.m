@@ -117,7 +117,7 @@ pr.boxPos = boxPos;
 pr.boxSize = boxSize;
 pr.boxYaw = boxYaw;
 pr.boxPosNoise = boxPosNoise;
-pr.meas_and_comm_range = 5.0;  % measurement and communication range, m
+pr.meas_and_comm_range = 2.0;  % measurement and communication range, m
 
 %% For mpc
 si_mpc_setup;

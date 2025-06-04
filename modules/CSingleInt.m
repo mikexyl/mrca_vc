@@ -770,7 +770,7 @@ classdef CSingleInt < handle
                 obj.last_pos = obj.pos_real_;
             end
             delta_pos = obj.pos_real_ - obj.last_pos;
-            odom_cov = obj.pos_measure_cov_;
+            odom_cov = obj.pos_measure_cov_*0.1;
             obj.last_pos = obj.pos_real_;
         end
         
