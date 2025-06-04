@@ -355,7 +355,6 @@ classdef CSystem < handle
                     msg.keys2(end).robot = char(j+'a'-1);
                     msg.keys2(end).label = 'p';
                     msg.keys2(end).key = int32(obj.time_step_global_);
-                    fprintf('Adding constraint between robot %d and %d\n', i, j);
                     pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                     pose_cov.pose.position.x = rels(1,k);
                     pose_cov.pose.position.y = rels(2,k);
@@ -398,32 +397,29 @@ classdef CSystem < handle
                     % Fill covariance from odom_cov_all
                     pose_cov.covariance = reshape(covToMat6(obj, odom_cov)', 1, 36);
                     msg.constraints(end+1) = pose_cov;
+                else
+                    % add priors to robot 0 for global optimization
+                    msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                    msg.keys1(end).robot = char(i+'a'-1);
+                    msg.keys1(end).label = 'p';
+                    msg.keys1(end).key = int32(0);
+                    msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
+                    msg.keys2(end).robot = char(i+'a'-1);
+                    msg.keys2(end).label = 'p';
+                    msg.keys2(end).key = int32(0);
+                    pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
+                    pose_cov.pose.position.x = obj.multi_robot_pos_est_(1,i);
+                    pose_cov.pose.position.y = obj.multi_robot_pos_est_(2,i);
+                    if obj.dim_ > 2
+                        pose_cov.pose.position.z = obj.multi_robot_pos_est_(3,i);
+                    end
+                    pose_cov.pose.orientation.w = 1;
+                    pose_cov.pose.orientation.x = 0;
+                    pose_cov.pose.orientation.y = 0;
+                    pose_cov.pose.orientation.z = 0;
+                    pose_cov.covariance = reshape(eye(6),1,36); % small covariance for prior
+                    msg.constraints(end+1) = pose_cov;
                 end
-            end
-
-
-            if obj.time_step_global_ == 0
-                % add priors to robot 0 for global optimization
-                msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
-                msg.keys1(end).robot = 'a'; % robot 0
-                msg.keys1(end).label = 'p';
-                msg.keys1(end).key = int32(obj.time_step_global_);
-                msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
-                msg.keys2(end).robot = 'a'; % robot 0
-                msg.keys2(end).label = 'p';
-                msg.keys2(end).key = int32(obj.time_step_global_);
-                pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
-                pose_cov.pose.position.x = obj.multi_robot_pos_est_(1,1);
-                pose_cov.pose.position.y = obj.multi_robot_pos_est_(2,1);
-                if obj.dim_ > 2
-                    pose_cov.pose.position.z = obj.multi_robot_pos_est_(3,1);
-                end
-                pose_cov.pose.orientation.w = 1;
-                pose_cov.pose.orientation.x = 0;
-                pose_cov.pose.orientation.y = 0;
-                pose_cov.pose.orientation.z = 0;
-                pose_cov.covariance = reshape(eye(6)*0.01,1,36); % small covariance for prior
-                msg.constraints(end+1) = pose_cov;
             end
 
 

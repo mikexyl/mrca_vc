@@ -312,6 +312,7 @@ while(true && n_loop < logsize)
     
     drawnow limitrate
     pause(0.01);
+    % keyboard;
 %     pause(pr.dtSim);
     
     %% end of simulation

@@ -86,6 +86,7 @@ classdef CSingleInt < handle
         mpc_ZPlan_          = [];                   % store entire planned MPC plan
         mpc_Path_           = [];                   % store MPC planned path
         
+        last_pos = []
     end
     
     
@@ -765,13 +766,12 @@ classdef CSingleInt < handle
             % delta_pos: position change since last call
             % odom_cov: odometry covariance (assume equal to pos_measure_cov_)
 
-            persistent last_pos
-            if isempty(last_pos)
-                last_pos = obj.pos_real_;
+            if isempty(obj.last_pos)
+                obj.last_pos = obj.pos_real_;
             end
-            delta_pos = obj.pos_real_ - last_pos;
+            delta_pos = obj.pos_real_ - obj.last_pos;
             odom_cov = obj.pos_measure_cov_;
-            last_pos = obj.pos_real_;
+            obj.last_pos = obj.pos_real_;
         end
         
     end
