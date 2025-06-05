@@ -32,6 +32,9 @@ classdef CSystem < handle
         multi_obs_pos_est_      =   [];
         multi_obs_pos_est_cov_  =   [];
 
+        gpgo_pos_est_    =   [];     % pos
+        gpgo_pos_est_cov_    =   [];     % pos
+
         %% collision info
         collision_mtx_          =   [];
 
@@ -40,10 +43,14 @@ classdef CSystem < handle
         control_                =   0;      % 0 - one-step; 1 - mpc
 
         meas_and_comm_range     =   5;      % measurement and communication range
-        clients =  {};
         reset_clients={};
+        clients =  {};
         global_client = []; % global client for pose graph optimization service
         global_reset_client=[];
+
+        est_type_ = 0;
+
+        comm_client = []; % global communication service client
     end
 
 
@@ -64,6 +71,8 @@ classdef CSystem < handle
 
             obj.nRobot_ =   nRobot;
             obj.nBoxObs_=   nBoxObs;
+
+            obj.est_type_=pr.est_type;
 
             for iRobot = 1 : nRobot
                 if pr.robot_type == 0
@@ -90,6 +99,9 @@ classdef CSystem < handle
             obj.multi_robot_pos_est_cov_=   zeros(obj.dim_, obj.dim_, nRobot);
             obj.multi_obs_pos_est_      =   zeros(obj.dim_, nBoxObs);
             obj.multi_obs_pos_est_cov_  =   zeros(obj.dim_, obj.dim_, nBoxObs);
+
+            obj.gpgo_pos_est_           =   zeros(obj.dim_, nRobot);
+            obj.gpgo_pos_est_cov_       =   zeros(obj.dim_, obj.dim_, nRobot);
 
             obj.collision_mtx_          =   zeros(nRobot, nRobot+nBoxObs);
 
@@ -124,6 +136,11 @@ classdef CSystem < handle
             global_reset_msg.message = timestamp_str;
             call(obj.global_reset_client, global_reset_msg);
             disp('initialized global')
+
+            % Initialize global communicate_robot service client (only once)
+            comm_service_name = '/communicate_robot';
+            comm_service_type = 'raido_interfaces/CommunicateRobot';
+            obj.comm_client = ros2svcclient(ros2_node, comm_service_name, comm_service_type);
         end
 
         function [rel_pos, idx_in_range, rel_cov] = getRelativeRobotMeas(obj, iRobot)
@@ -190,20 +207,34 @@ classdef CSystem < handle
             for iRobot = 1 : obj.nRobot_
 
                 % ===== ego robot estimated state =====
-                obj.MultiRobot_{iRobot}.pos_est_ = obj.multi_robot_pos_est_(:, iRobot);
-                obj.MultiRobot_{iRobot}.pos_est_cov_ = obj.multi_robot_pos_est_cov_(:,:,iRobot);
+                if obj.est_type_ == 0
+                    obj.MultiRobot_{iRobot}.pos_est_ = obj.multi_robot_pos_est_(:, iRobot);
+                    obj.MultiRobot_{iRobot}.pos_est_cov_ = obj.multi_robot_pos_est_cov_(:,:,iRobot);
+                elseif obj.est_type_ == 1
+                    obj.MultiRobot_{iRobot}.pos_est_ = obj.gpgo_pos_est_(:, iRobot);
+                    obj.MultiRobot_{iRobot}.pos_est_cov_ = obj.gpgo_pos_est_cov_(:,:,iRobot);
+                else
+                    error("not implemented")
+                end
 
                 % ===== compute local bound =====
                 obj.MultiRobot_{iRobot}.computeLocalBound();
 
                 % ===== obtain local robot info =====
-                obj.MultiRobot_{iRobot}.getLocalRobotInfo(...
+                if obj.est_type_ == 0
+                  obj.MultiRobot_{iRobot}.getLocalRobotInfo(...
                     obj.multi_robot_pos_est_, obj.multi_robot_pos_est_cov_);
+                elseif obj.est_type_ == 1
+                  obj.MultiRobot_{iRobot}.getLocalRobotInfo(...
+                    obj.gpgo_pos_est_, obj.gpgo_pos_est_cov_);
+                end
+
 
                 % ===== obtain local box obs info =====
                 obj.MultiRobot_{iRobot}.getLocalObsInfo(...
                     obj.multi_obs_pos_est_, obj.multi_obs_pos_est_cov_, ...
                     obj.multi_obs_size_real_, obj.multi_obs_yaw_real_);
+
 
                 % ===== deadlock checking =====
                 obj.MultiRobot_{iRobot}.deadlockChecking();
@@ -429,7 +460,7 @@ classdef CSystem < handle
                     pose_cov.pose.orientation.x = 0;
                     pose_cov.pose.orientation.y = 0;
                     pose_cov.pose.orientation.z = 0;
-                    pose_cov.covariance = reshape(eye(6),1,36); % small covariance for prior
+                    pose_cov.covariance = reshape(eye(6)*0.01,1,36); % small covariance for prior
                     msg.constraints(end+1) = pose_cov;
                 end
             end
@@ -454,7 +485,7 @@ classdef CSystem < handle
                     cov_vec = response.poses(i).covariance;
                     cov_mat = reshape(cov_vec, 6, 6)';
 
-                    covs(:,:,iRobot)=cov_mat(obj.dim_, obj.dim_);
+                    covs(:,:,iRobot)=cov_mat(1:obj.dim_, 1:obj.dim_);
                 end
             else
                 % print warning if no optimized poses returned
@@ -466,7 +497,20 @@ classdef CSystem < handle
             end
         end
 
-        function [opt_pose, cov] = distributedPGO(obj, iRobot)
+        function [optimized_poses, covs]=updateRobotEstCovFromGlobalPGO(obj)
+            % Call globalPGO and update multi_robot_pos_est_ and multi_robot_pos_est_cov_
+            [optimized_poses, covs] = obj.globalPGO();
+            if ~isempty(optimized_poses)
+                for iRobot = 1:obj.nRobot_
+                    obj.gpgo_pos_est_(:, iRobot) = optimized_poses(:, iRobot);
+                    obj.gpgo_pos_est_cov_(:, :, iRobot) = covs(:, :, iRobot);
+                end
+            else
+                warning('No optimized poses returned in updateRobotEstCovFromGlobalPGO. State not updated.');
+            end
+        end
+
+        function [opt_pose, cov] = distributedPGO(obj, iRobot, use_comm)
             % Collect local measurements for iRobot and send to its dpgo_server
             % Returns optimized pose and covariance for iRobot
 
@@ -599,7 +643,7 @@ classdef CSystem < handle
                 pose_cov.pose.orientation.x = 0;
                 pose_cov.pose.orientation.y = 0;
                 pose_cov.pose.orientation.z = 0;
-                pose_cov.covariance = reshape(eye(6),1,36);
+                pose_cov.covariance = reshape(eye(6)*0.01,1,36);
                 msg.constraints(end+1) = pose_cov;
             end
 
@@ -627,6 +671,35 @@ classdef CSystem < handle
                 disp(response);
                 opt_pose = [];
                 cov = [];
+            end
+
+            %% if use communication, call the communicate_robot service (global, only once)
+            if nargin > 2 && use_comm && ~isempty(obj.comm_client)
+                % Generate robot pairs from relative measurements
+                robot_pairs = [];
+                for r = 1:obj.nRobot_
+                    [~, idx_in_range, ~] = obj.getRelativeRobotMeas(r);
+                    for k = 1:length(idx_in_range)
+                        i = r;
+                        j = idx_in_range(k);
+                        if i < j
+                            robot_pairs = [robot_pairs; i, j];
+                        elseif j < i
+                            robot_pairs = [robot_pairs; j, i];
+                        end
+                    end
+                end
+
+                robot_pairs = char(robot_pairs + 'a' - 1); % Convert to char for service message
+                % convert to row vector, p00, p01, p10, p11, etc.
+                robot_pairs = reshape(robot_pairs', 1, []); % Convert to row vector
+
+                % Prepare the communicate_robot request
+                comm_msg = ros2message(obj.comm_client);
+                comm_msg.robot_pairs = robot_pairs; % Set the robot pairs
+                comm_msg.rounds = int32(10);
+                % Add any additional fields as required by the service definition
+                comm_response = call(obj.comm_client, comm_msg);
             end
         end
 

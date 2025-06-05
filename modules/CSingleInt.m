@@ -87,6 +87,7 @@ classdef CSingleInt < handle
         mpc_Path_           = [];                   % store MPC planned path
         
         last_pos = []
+        est_type=0 
     end
     
     
@@ -175,6 +176,8 @@ classdef CSingleInt < handle
             else
                 obj.goal_tolerance_ = 0.10; % in deterministic case
             end
+
+            obj.est_type=pr.est_type;
             
         end
         
@@ -769,7 +772,7 @@ classdef CSingleInt < handle
                 obj.last_pos = obj.pos_real_;
             end
             delta_pos = obj.pos_real_ - obj.last_pos;
-            odom_cov = obj.pos_measure_cov_*0.1;
+            odom_cov = obj.pos_measure_cov_*0.02;
         end
         
     end

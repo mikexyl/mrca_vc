@@ -9,8 +9,8 @@ setPath;
 global pr
 % environment dimension
 pr.dim = mode_dim;                % problem dimension
-xdim = [-5, 5];                   % workspace
-ydim = [-5, 5];
+xdim = [-10, 10];                   % workspace
+ydim = [-10, 10];
 zdim = [ 0, 3];
 if pr.dim == 2
     pr.ws = [xdim; ydim];
@@ -21,7 +21,7 @@ end
 % robot physics
 pr.robot_type = 0;                  % robot type
 pr.radius = 0.2;                    % robot radius
-pr.maxSpeed = 0.4;                  % robot maximal speed
+pr.maxSpeed = 1;                  % robot maximal speed
 pr.boundLocalRadius = 2.0;          % local bound radius, m
 % simulation setup
 pr.dtSim = 0.1;                     % time step, s
@@ -29,7 +29,7 @@ pr.N = 10;                          % number of stage
 pr.ifSimRobotNoise = 1;             % if simulating measurement noise
 pr.ifSimBoxObsNoise= 1;
 % collision probability threshold
-pr.collision_probability = 0.10;
+pr.collision_probability = 0.20;
 pr.collision_parameter = erfinv(2*sqrt(1-pr.collision_probability) - 1);
 % BVC or BUAVC
 pr.method = mode_region;            % 0 - BVC; 1 - BUAVC
@@ -69,7 +69,7 @@ cfg.ifShowVelocity    = 0;          % if plotting robot velocity
 % static obstacles
 if pr.dim == 2
     vert_m = 4;
-    [nBoxObs, boxPos, boxSize, boxYaw] = box_initial_2D(3);
+    [nBoxObs, boxPos, boxSize, boxYaw] = box_initial_2D(0);
 elseif pr.dim == 3
     vert_m = 8;
     [nBoxObs, boxPos, boxSize, boxYaw] = box_initial_3D(3);
@@ -81,7 +81,7 @@ for iBox = 1 : nBoxObs
     boxVert(:, :, iBox) = temp_vert;        % dim * m * nBoxObs
 end
 % multiple robot, robot initial and end position should not collide with each other and with obstacles
-nRobot          = 5;                        % number of robots
+nRobot          = 7;                        % number of robots
 collision_mtx   = ones(nRobot, nRobot+nBoxObs);
 while (sum(sum(collision_mtx)) > 0)
     fprintf('Generating robot initial positions and goals ... \n');
@@ -117,7 +117,7 @@ pr.boxPos = boxPos;
 pr.boxSize = boxSize;
 pr.boxYaw = boxYaw;
 pr.boxPosNoise = boxPosNoise;
-pr.meas_and_comm_range = 2.0;  % measurement and communication range, m
-
+pr.meas_and_comm_range = 3.0;  % measurement and communication range, m
+pr.est_type = 1;
 %% For mpc
 si_mpc_setup;

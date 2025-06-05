@@ -197,7 +197,7 @@ while(true && n_loop < logsize)
 
     %% control loop
     n_loop = n_loop + 1;
-    if(mod(n_loop, 10) == 0)
+    if(mod(n_loop, 1) == 0)
         fprintf('[%s] Looping [%d] \n',datestr(now,'HH:MM:SS'), n_loop);
     end
 
@@ -205,7 +205,8 @@ while(true && n_loop < logsize)
     System.getSystemState();
 
     %% global pgo
-    [optimized_poses, covs] = System.globalPGO();
+    [optimized_poses, covs] = System.updateRobotEstCovFromGlobalPGO();
+    % [optimized_poses, covs] = System.globalPGO();
     % Visualize optimized poses in the same style as robots, but with black dashed edge and no fill
     if ~isempty(optimized_poses)
         for iRobot = 1 : nRobot
@@ -227,7 +228,12 @@ while(true && n_loop < logsize)
     dpgo_poses = cell(nRobot, 1);
     dpgo_covs = cell(nRobot, 1);
     for iRobot = 1:nRobot
-        [dpgo_poses{iRobot}, dpgo_covs{iRobot}] = System.distributedPGO(iRobot);
+        [dpgo_poses{iRobot}, dpgo_covs{iRobot}] = System.distributedPGO(iRobot, 1);
+        [Xdpgo, Ydpgo] = ellipse(dpgo_poses{iRobot}{iRobot}, System.MultiRobot_{iRobot}.radius_.*[1;1], 0);
+        [Xdpgo_cov, Ydpgo_cov] = ellipse(dpgo_poses{iRobot}{iRobot}, ...
+            sqrt(diag(dpgo_covs{iRobot}{iRobot})), 0);
+        set(fig_robot_dpgo_pos{iRobot}, 'XData', Xdpgo, 'YData', Ydpgo);
+        set(fig_robot_dpgo_cov{iRobot}, 'XData', Xdpgo_cov, 'YData', Ydpgo_cov);
     end
 
     %% logging state info
