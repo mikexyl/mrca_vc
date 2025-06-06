@@ -34,6 +34,9 @@ classdef CSystem < handle
 
         gpgo_pos_est_    =   [];     % pos
         gpgo_pos_est_cov_    =   [];     % pos
+        
+        dpgo_pose_est_           =   [];     % distributed PGO pose estimate
+        dpgo_pose_est_cov_       =   [];     % distributed PGO pose covariance
 
         %% collision info
         collision_mtx_          =   [];
@@ -370,7 +373,7 @@ classdef CSystem < handle
                 msg.initial_pose_keys(i) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.initial_pose_keys(i).robot = char(i+'a'-1);
                 msg.initial_pose_keys(i).label = 'p';
-                msg.initial_pose_keys(i).key = int32(obj.time_step_global_);
+                msg.initial_pose_keys(i).index = int32(obj.time_step_global_);
             end
             % Fill constraints (relative measurements)
             tmp = ros2message('raido_interfaces/MultiRobotKey');
@@ -387,11 +390,11 @@ classdef CSystem < handle
                     msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys1(end).robot = char(i+'a'-1);
                     msg.keys1(end).label = 'p';
-                    msg.keys1(end).key = int32(obj.time_step_global_);
+                    msg.keys1(end).index = int32(obj.time_step_global_);
                     msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys2(end).robot = char(j+'a'-1);
                     msg.keys2(end).label = 'p';
-                    msg.keys2(end).key = int32(obj.time_step_global_);
+                    msg.keys2(end).index = int32(obj.time_step_global_);
                     pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                     pose_cov.pose.position.x = rels(1,k);
                     pose_cov.pose.position.y = rels(2,k);
@@ -418,11 +421,11 @@ classdef CSystem < handle
                     msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys1(end).robot = char(i+'a'-1);
                     msg.keys1(end).label = 'p';
-                    msg.keys1(end).key = int32(obj.time_step_global_-1);
+                    msg.keys1(end).index = int32(obj.time_step_global_-1);
                     msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys2(end).robot = char(i+'a'-1);
                     msg.keys2(end).label = 'p';
-                    msg.keys2(end).key = int32(obj.time_step_global_);
+                    msg.keys2(end).index = int32(obj.time_step_global_);
                     pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                     pose_cov.pose.position.x = delta_pos(1);
                     pose_cov.pose.position.y = delta_pos(2);
@@ -443,11 +446,11 @@ classdef CSystem < handle
                     msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys1(end).robot = char(i+'a'-1);
                     msg.keys1(end).label = 'p';
-                    msg.keys1(end).key = int32(0);
+                    msg.keys1(end).index = int32(0);
                     msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                     msg.keys2(end).robot = char(i+'a'-1);
                     msg.keys2(end).label = 'p';
-                    msg.keys2(end).key = int32(0);
+                    msg.keys2(end).index = int32(0);
                     pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                     pose_cov.pose.position.x = obj.multi_robot_pos_est_(1,i);
                     pose_cov.pose.position.y = obj.multi_robot_pos_est_(2,i);
@@ -510,7 +513,7 @@ classdef CSystem < handle
             end
         end
 
-        function [opt_pose, cov] = distributedPGO(obj, iRobot, use_comm)
+        function [opt_pose, cov] = distributedPGO(obj, iRobot)
             % Collect local measurements for iRobot and send to its dpgo_server
             % Returns optimized pose and covariance for iRobot
 
@@ -542,7 +545,7 @@ classdef CSystem < handle
             msg.initial_pose_keys = ros2message('raido_interfaces/MultiRobotKey');
             msg.initial_pose_keys(1).robot = char(iRobot+'a'-1);
             msg.initial_pose_keys(1).label = 'p';
-            msg.initial_pose_keys(1).key = int32(obj.time_step_global_);
+            msg.initial_pose_keys(1).index = int32(obj.time_step_global_);
 
             % Add initial poses for observed neighbors
             for n = 1:length(idx_in_range)
@@ -562,7 +565,7 @@ classdef CSystem < handle
                 msg.initial_pose_keys(idx_pose) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.initial_pose_keys(idx_pose).robot = char(j+'a'-1);
                 msg.initial_pose_keys(idx_pose).label = 'p';
-                msg.initial_pose_keys(idx_pose).key = int32(obj.time_step_global_);
+                msg.initial_pose_keys(idx_pose).index = int32(obj.time_step_global_);
             end
 
             % Fill constraints (relative measurements)
@@ -576,11 +579,11 @@ classdef CSystem < handle
                 msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.keys1(end).robot = char(iRobot+'a'-1);
                 msg.keys1(end).label = 'p';
-                msg.keys1(end).key = int32(obj.time_step_global_);
+                msg.keys1(end).index = int32(obj.time_step_global_);
                 msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.keys2(end).robot = char(j+'a'-1);
                 msg.keys2(end).label = 'p';
-                msg.keys2(end).key = int32(obj.time_step_global_);
+                msg.keys2(end).index = int32(obj.time_step_global_);
                 pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                 pose_cov.pose.position.x = rel_pos(1,k);
                 pose_cov.pose.position.y = rel_pos(2,k);
@@ -602,11 +605,11 @@ classdef CSystem < handle
                 msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.keys1(end).robot = char(iRobot+'a'-1);
                 msg.keys1(end).label = 'p';
-                msg.keys1(end).key = int32(obj.time_step_global_-1);
+                msg.keys1(end).index = int32(obj.time_step_global_-1);
                 msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.keys2(end).robot = char(iRobot+'a'-1);
                 msg.keys2(end).label = 'p';
-                msg.keys2(end).key = int32(obj.time_step_global_);
+                msg.keys2(end).index = int32(obj.time_step_global_);
                 pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                 pose_cov.pose.position.x = delta_pos(1);
                 pose_cov.pose.position.y = delta_pos(2);
@@ -626,11 +629,11 @@ classdef CSystem < handle
                 msg.keys1(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.keys1(end).robot = char(iRobot+'a'-1);
                 msg.keys1(end).label = 'p';
-                msg.keys1(end).key = int32(0);
+                msg.keys1(end).index = int32(0);
                 msg.keys2(end+1) = ros2message('raido_interfaces/MultiRobotKey');
                 msg.keys2(end).robot = char(iRobot+'a'-1);
                 msg.keys2(end).label = 'p';
-                msg.keys2(end).key = int32(0);
+                msg.keys2(end).index = int32(0);
                 pose_cov = ros2message('geometry_msgs/PoseWithCovariance');
                 pose_cov.pose.position.x = obj.multi_robot_pos_est_(1,iRobot);
                 pose_cov.pose.position.y = obj.multi_robot_pos_est_(2,iRobot);
@@ -673,33 +676,51 @@ classdef CSystem < handle
                 cov = [];
             end
 
-            %% if use communication, call the communicate_robot service (global, only once)
-            if nargin > 2 && use_comm && ~isempty(obj.comm_client)
-                % Generate robot pairs from relative measurements
-                robot_pairs = [];
-                for r = 1:obj.nRobot_
-                    [~, idx_in_range, ~] = obj.getRelativeRobotMeas(r);
-                    for k = 1:length(idx_in_range)
-                        i = r;
-                        j = idx_in_range(k);
-                        if i < j
-                            robot_pairs = [robot_pairs; i, j];
-                        elseif j < i
-                            robot_pairs = [robot_pairs; j, i];
-                        end
+        end
+
+        function communicateRobots(obj)
+            % Generate robot pairs from relative measurements and call the communicate_robot service
+            if isempty(obj.comm_client)
+                return;
+            end
+            robot_pairs = [];
+            for r = 1:obj.nRobot_
+                [~, idx_in_range, ~] = obj.getRelativeRobotMeas(r);
+                for k = 1:length(idx_in_range)
+                    i = r;
+                    j = idx_in_range(k);
+                    if i < j
+                        robot_pairs = [robot_pairs; i, j];
+                    elseif j < i
+                        robot_pairs = [robot_pairs; j, i];
                     end
                 end
+            end
+            if isempty(robot_pairs)
+                return;
+            end
+            robot_pairs = char(robot_pairs + 'a' - 1); % Convert to char for service message
+            robot_pairs = reshape(robot_pairs', 1, []); % Convert to row vector
+            comm_msg = ros2message(obj.comm_client);
+            comm_msg.robot_pairs = robot_pairs; % Set the robot pairs
+            comm_msg.rounds = int32(10);
+            % Add any additional fields as required by the service definition
+            comm_response = call(obj.comm_client, comm_msg);
+        end
 
-                robot_pairs = char(robot_pairs + 'a' - 1); % Convert to char for service message
-                % convert to row vector, p00, p01, p10, p11, etc.
-                robot_pairs = reshape(robot_pairs', 1, []); % Convert to row vector
-
-                % Prepare the communicate_robot request
-                comm_msg = ros2message(obj.comm_client);
-                comm_msg.robot_pairs = robot_pairs; % Set the robot pairs
-                comm_msg.rounds = int32(10);
-                % Add any additional fields as required by the service definition
-                comm_response = call(obj.comm_client, comm_msg);
+        function [dpgo_poses, dpgo_covs] = updateRobotEstCovFromDistPGO(obj)
+            dpgo_poses = cell(obj.nRobot_, 1);
+            dpgo_covs = cell(obj.nRobot_, 1);
+            for iRobot = 1:obj.nRobot_
+                [opt_pose, cov] = obj.distributedPGO(iRobot);
+                if ~isempty(opt_pose) && ~isempty(cov) && ~isempty(opt_pose{iRobot}) && ~isempty(cov{iRobot})
+                    obj.dpgo_pose_est_(:, iRobot) = opt_pose{iRobot};
+                    obj.dpgo_pose_est_cov_(:, :, iRobot) = cov{iRobot};
+                    dpgo_poses{iRobot} = opt_pose;
+                    dpgo_covs{iRobot} = cov;
+                else
+                    warning('No optimized pose returned in updateRobotEstCovFromDistPGO for robot %d. State not updated.', iRobot);
+                end
             end
         end
 

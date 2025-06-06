@@ -197,7 +197,7 @@ while(true && n_loop < logsize)
 
     %% control loop
     n_loop = n_loop + 1;
-    if(mod(n_loop, 1) == 0)
+    if(mod(n_loop, 1) == 10)
         fprintf('[%s] Looping [%d] \n',datestr(now,'HH:MM:SS'), n_loop);
     end
 
@@ -225,16 +225,16 @@ while(true && n_loop < logsize)
     end
 
     %% distributed pgo
-    dpgo_poses = cell(nRobot, 1);
-    dpgo_covs = cell(nRobot, 1);
+    [dpgo_poses, dpgo_covs] = System.updateRobotEstCovFromDistPGO();
     for iRobot = 1:nRobot
-        [dpgo_poses{iRobot}, dpgo_covs{iRobot}] = System.distributedPGO(iRobot, 1);
         [Xdpgo, Ydpgo] = ellipse(dpgo_poses{iRobot}{iRobot}, System.MultiRobot_{iRobot}.radius_.*[1;1], 0);
         [Xdpgo_cov, Ydpgo_cov] = ellipse(dpgo_poses{iRobot}{iRobot}, ...
             sqrt(diag(dpgo_covs{iRobot}{iRobot})), 0);
         set(fig_robot_dpgo_pos{iRobot}, 'XData', Xdpgo, 'YData', Ydpgo);
         set(fig_robot_dpgo_cov{iRobot}, 'XData', Xdpgo_cov, 'YData', Ydpgo_cov);
     end
+
+    System.communicateRobots();
 
     %% logging state info
     for iRobot = 1 : nRobot
